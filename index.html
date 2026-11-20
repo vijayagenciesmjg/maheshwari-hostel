@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#b5451b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Maheshwari Hostel Directory</title>
+<style>
+:root{--bg:#faf6f0;--card:#fff;--ink:#2a2118;--mute:#7a6c5d;--acc:#b5451b;--acc2:#fbe7dc;--line:#e8dfd3;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#1a1511;--card:#251e18;--ink:#f3ebe2;--mute:#b3a493;--acc:#f0875a;--acc2:#3a2a20;--line:#3a3027;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:720px;margin:0 auto;padding:14px}
+h1{font-size:20px;margin:4px 0 2px}.sub,.mt{color:var(--mute);font-size:13px}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin:10px 0}
+button{font:inherit;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 13px;border-radius:999px;cursor:pointer;white-space:nowrap}
+button.on,button.pri{background:var(--acc);color:#fff;border-color:var(--acc)}
+input,textarea{font:inherit;width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);margin-bottom:8px}
+.row{display:flex;gap:8px;align-items:flex-end}.row>div{flex:1}
+.box{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:10px}
+.card{display:flex;gap:12px}
+.av{width:42px;height:42px;border-radius:50%;background:var(--acc2);color:var(--acc);display:grid;place-items:center;font-weight:700;flex:none}
+.nm{font-weight:650}.kw{color:var(--mute);font-size:12px}
+a.act{color:var(--acc);text-decoration:none;font-size:13px;margin-right:14px;font-weight:600}
+.bday{background:var(--acc2);border:1px solid var(--acc)}
+h3{font-size:14px;color:var(--mute);margin:14px 2px 6px}
+label{font-size:12px;color:var(--mute)}.hide{display:none}.err{color:#c0392b;font-size:13px;min-height:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>Maheshwari Hostel Directory</h1>
+<div class="sub">Chhatrapati Sambhajinagar</div>
+
+<div id="gate" class="box" style="margin-top:14px">
+  <b>Enter access password</b>
+  <div class="mt" style="margin-bottom:8px">Ask the hostel committee or your batch-mates for the password.</div>
+  <input id="pw" type="password" placeholder="Password" autocomplete="current-password">
+  <div class="err" id="gerr"></div>
+  <button class="pri" id="go">Open directory</button>
+  <button id="showjoin">Request to join</button>
+</div>
+
+<div id="join" class="box hide">
+  <b>Request to join</b>
+  <div class="mt" style="margin-bottom:8px">The admin will review your details and get back to you.</div>
+  <input id="jn" placeholder="Full name">
+  <input id="jm" placeholder="Mobile number (10 digits)" inputmode="numeric">
+  <input id="jc" placeholder="City">
+  <textarea id="jd" rows="2" placeholder="Years you stayed in the hostel (e.g. 2006–2008, 2010–2013)"></textarea>
+  <div class="err" id="jerr"></div>
+  <button class="pri" id="jsend">Send request</button>
+  <button id="jback">Back</button>
+</div>
+
+<div id="app" class="hide">
+  <div id="bd"></div>
+  <div class="tabs" id="tabs"></div>
+  <div id="search">
+    <input id="q" placeholder="Search name, city, profession, keywords (e.g. CCTV, catering)…" aria-label="Search">
+    <div class="row">
+      <div><label>Batch from (year)</label><input id="yf" type="number" placeholder="2006"></div>
+      <div><label>Batch to (year)</label><input id="yt" type="number" placeholder="2013"></div>
+      <button id="clr" style="margin-bottom:8px">Clear</button>
+    </div>
+  </div>
+  <div class="mt" id="count" style="margin:4px 2px"></div>
+  <div id="list"></div>
+  <div style="margin:16px 0"><button id="lock">Lock</button></div>
+</div>
+</div>
+
+<script>
+var SB_URL="https://hjumlfaruheksjhzszsb.supabase.co";
+var SB_KEY="PASTE_ANON_KEY_HERE";
+var NOW=new Date().getFullYear();
+var TABS=[["alumni","Alumni"],["rector","Rectors"],["watchman","Watchmen"],["mess","Mess"],["bday","Birthdays"]];
+var S={rows:[],tab:"alumni"};
+function $(i){return document.getElementById(i)}
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function show(id,on){$(id).classList[on?"remove":"add"]("hide")}
+function call(path,body,extra){
+  var h={"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"};
+  if(extra)for(var k in extra)h[k]=extra[k];
+  return fetch(SB_URL+"/rest/v1/"+path,{method:"POST",headers:h,body:JSON.stringify(body)});
+}
+function unlock(pw,auto){
+  if(SB_KEY.indexOf("PASTE")==0){$("gerr").textContent="App is not configured yet (missing key).";return}
+  $("gerr").textContent="";
+  call("rpc/get_directory",{p:pw}).then(function(r){
+    if(!r.ok){ if(auto){try{localStorage.removeItem("mh_pw")}catch(e){}} else $("gerr").textContent="Wrong password or no connection."; return null }
+    return r.json();
+  }).then(function(rows){
+    if(!rows)return;
+    S.rows=rows;try{localStorage.setItem("mh_pw",pw)}catch(e){}
+    show("gate",false);show("app",true);$("pw").value="";render();
+  }).catch(function(){ if(!auto)$("gerr").textContent="Could not connect. Check your internet." });
+}
+function fmt(st){return (st||[]).map(function(s){
+  if(!s.from)return"";var t=s.to==null?"Present":s.to;return s.from==t?s.from:s.from+"–"+t}).filter(Boolean).join(" · ")}
+function overlap(st,a,b){return (st||[]).some(function(s){
+  if(!s.from)return false;var e=s.to==null?NOW:s.to;return s.from<=b&&a<=e})}
+function digits(p){return String(p||"").replace(/\D/g,"").slice(-10)}
+function card(m,staff){
+  var nm=(m.first_name+" "+(m.surname||"")).trim(),
+      ini=((m.first_name||"")[0]||"")+((m.surname||"")[0]||""),
+      d=digits(m.mobile),w=digits(m.whatsapp||m.mobile),st=fmt(m.stays);
+  return '<div class="box card"><div class="av">'+esc(ini.toUpperCase())+'</div><div style="flex:1;min-width:0"><div class="nm">'+esc(nm)+'</div>'+
+   '<div class="mt">'+esc([m.profession,m.city].filter(Boolean).join(" · "))+'</div>'+
+   (m.keywords?'<div class="kw">'+esc(m.keywords)+'</div>':"")+
+   (st?'<div class="mt">'+(staff?"Tenure: ":"Stayed: ")+esc(st)+'</div>':"")+
+   '<div style="margin-top:6px">'+(d.length==10?'<a class="act" href="tel:+91'+d+'">Call</a>':"")+(w.length==10?'<a class="act" href="https://wa.me/91'+w+'" target="_blank" rel="noopener">WhatsApp</a>':"")+'</div></div></div>';
+}
+function bdays(){
+  var t=new Date();t=new Date(t.getFullYear(),t.getMonth(),t.getDate());
+  return S.rows.filter(function(m){return m.birthday}).map(function(m){
+    var p=m.birthday.split("-"),d=new Date(NOW,+p[1]-1,+p[0]);
+    if(d<t)d=new Date(NOW+1,+p[1]-1,+p[0]);
+    return{m:m,days:Math.round((d-t)/864e5),on:d}
+  }).sort(function(a,b){return a.days-b.days});
+}
+function renderBanner(){
+  var today=bdays().filter(function(x){return x.days==0});
+  $("bd").innerHTML=today.map(function(x){
+    var n=(x.m.first_name+" "+(x.m.surname||"")).trim(),w=digits(x.m.whatsapp||x.m.mobile);
+    return '<div class="box bday">🎂 Today is <b>'+esc(n)+'</b>’s birthday! '+(w.length==10?'<a class="act" href="https://wa.me/91'+w+'?text='+encodeURIComponent("Happy Birthday "+x.m.first_name+"! 🎉")+'" target="_blank" rel="noopener">Send wishes</a>':"")+'</div>'}).join("");
+}
+function render(){
+  renderBanner();
+  $("tabs").innerHTML=TABS.map(function(t){return '<button class="'+(t[0]==S.tab?"on":"")+'" data-k="'+t[0]+'">'+t[1]+'</button>'}).join("");
+  Array.prototype.forEach.call($("tabs").children,function(b){b.onclick=function(){S.tab=b.dataset.k;render()}});
+  if(S.tab=="bday"){
+    show("search",false);var b=bdays();$("count").textContent="";
+    var g=[["Today",0,0],["Next 7 days",1,7],["Next 30 days",8,30],["Later",31,999]],out="";
+    g.forEach(function(x){var r=b.filter(function(y){return y.days>=x[1]&&y.days<=x[2]});
+      if(r.length)out+="<h3>"+x[0]+"</h3>"+r.map(function(y){
+        var n=(y.m.first_name+" "+(y.m.surname||"")).trim();
+        return '<div class="box"><span class="nm">'+esc(n)+'</span> <span class="mt">· '+y.on.toLocaleDateString("en-IN",{day:"numeric",month:"long"})+'</span></div>'}).join("")});
+    $("list").innerHTML=out||'<div class="mt">No birthdays recorded yet.</div>';return;
+  }
+  show("search",true);
+  var q=$("q").value.trim().toLowerCase(),yf=parseInt($("yf").value,10),yt=parseInt($("yt").value,10),rng=yf>0||yt>0;
+  var a=yf>0?yf:1900,z=yt>0?yt:NOW;
+  var rows=S.rows.filter(function(m){
+    if(m.kind!=S.tab)return false;
+    if(q&&[m.first_name,m.surname,m.city,m.profession,m.keywords,m.mobile].join(" ").toLowerCase().indexOf(q)<0)return false;
+    if(rng&&!overlap(m.stays,a,z))return false;
+    return true;
+  }).sort(function(x,y){return (x.first_name+x.surname).localeCompare(y.first_name+y.surname)});
+  $("count").textContent=rows.length+" found"+(rng?" for batch "+(yf>0?yf:"start")+"–"+(yt>0?yt:"present"):"");
+  $("list").innerHTML=rows.map(function(m){return card(m,S.tab!="alumni")}).join("")||'<div class="mt">No matches. Try a wider year range.</div>';
+}
+$("q").oninput=$("yf").oninput=$("yt").oninput=render;
+$("clr").onclick=function(){$("q").value=$("yf").value=$("yt").value="";render()};
+$("go").onclick=function(){unlock($("pw").value,false)};
+$("pw").onkeydown=function(e){if(e.key=="Enter")unlock($("pw").value,false)};
+$("lock").onclick=function(){try{localStorage.removeItem("mh_pw")}catch(e){}S.rows=[];show("app",false);show("gate",true)};
+$("showjoin").onclick=function(){show("gate",false);show("join",true)};
+$("jback").onclick=function(){show("join",false);show("gate",true)};
+$("jsend").onclick=function(){
+  var n=$("jn").value.trim(),m=digits($("jm").value);
+  if(!n||m.length!=10){$("jerr").textContent="Please enter your name and a 10-digit mobile number.";return}
+  call("join_requests",{name:n,mobile:m,city:$("jc").value.trim(),stay_details:$("jd").value.trim()},{"Prefer":"return=minimal"}).then(function(r){
+    if(r.ok){$("jerr").textContent="";$("join").innerHTML='<b>Thank you!</b><div class="mt">Your request was sent. The admin will contact you.</div>'}
+    else $("jerr").textContent="Could not send. Please try again."}).catch(function(){$("jerr").textContent="Could not connect."});
+};
+try{var saved=localStorage.getItem("mh_pw");if(saved)unlock(saved,true)}catch(e){}
+if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js").catch(function(){});
+</script>
+</body>
+</html>
